@@ -1,1 +1,1 @@
-from .context import load_yaml as init
+from .context import Context

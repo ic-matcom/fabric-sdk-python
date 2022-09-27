@@ -5,14 +5,15 @@ except ImportError:
     from yaml import Loader, Dumper
 from fabric_sdk.__env__ import FABRIC_PYTHON_SDK_NETWORK_CONFIG
 import os
-from .context import Context
+from .context import ContextClient, ConfigManager
 
 
-def load_network_config() -> Context:
+def Context(client_name=None, network_name=None) -> ContextClient:
     config_path = os.getenv(FABRIC_PYTHON_SDK_NETWORK_CONFIG)
+    manager = ConfigManager()
 
     with open(config_path, 'r') as config_file:
         config = config_file.read()
         config = load(config, Loader=Loader)
 
-    return Context(config)
+    return manager.client_compile(client_name, network_name)
