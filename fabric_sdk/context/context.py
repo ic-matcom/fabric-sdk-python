@@ -1,10 +1,4 @@
-
-
-from ast import List
-from decimal import InvalidContext
-from msilib.schema import Error
-from token import EXACT_TOKEN_TYPES
-from typing import Dict
+from typing import List, Dict
 
 
 def dict_get(_dict):
@@ -80,7 +74,7 @@ class ClientConfig:
         self.credential_store = credential_store
 
     @staticmethod
-    def load(config, default_name):
+    def load(config):
         config_get = dict_get(config)
         return ClientConfig(
             organization=config_get('organization', lambda: ''),
@@ -103,6 +97,8 @@ class ContextClient:
         self.orgs: OrgConfig = orgs
         self.ca_list: List[MSPConfig] = ca_list
 
+# TODO: Doc Exception
+
 
 class ConfigManager:
     def __init__(self) -> None:
@@ -116,35 +112,36 @@ class ConfigManager:
             except KeyError:
 
                 if len(self._networks) == 1:
-                    return next(self._networks.values())
+                    return list(self._networks.values())[0]
                 else:
-                    raise Error()
+                    raise Exception()
         else:
             try:
                 return self._networks[name]
             except KeyError:
-                raise Error()
+                raise Exception()
 
     def _select_client(self, network: Network, name=None) -> ClientConfig:
         if name is None:
+            print(network.client)
             if len(network.client) == 1:
                 return network.client[0]
             else:
-                raise Error()
+                raise Exception()
         else:
             try:
                 return [client for client in network.client if client.organization == name][0]
             except KeyError:
-                raise Error()
+                raise Exception()
 
     def client_compile(self, client_name=None, network_name=None) -> ContextClient:
         network = self._select_network(network_name)
-        client = self._select_client(client_name, network)
+        client = self._select_client(network, name=client_name)
 
         try:
             org: OrgConfig = network._dict_org[client.organization]
         except KeyError:
-            raise Error()
+            raise Exception()
 
         ca_list = []
 

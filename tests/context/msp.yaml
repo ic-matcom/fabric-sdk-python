@@ -69,3 +69,31 @@ certificateAuthorities:
       enrollSecret: adminpw
     # [Optional] The optional name of the CA.
     caName: ca.org2.example.com
+
+client:
+  BCCSP:
+    security:
+      default:
+        provider: SW
+      enabled: true
+      hashAlgorithm: SHA2
+      level: 256
+      softVerify: true
+  credentialStore:
+    cryptoStore:
+      path: ../crypto-config/peerOrganizations/org1.example.com/users
+    path: ../crypto-config/peerOrganizations/org1.example.com/users
+  cryptoconfig:
+    path: ../crypto-config/peerOrganizations/org1.example.com/users
+  logging:
+    level: info
+  organization: org1
+
+organizations:
+  org1:
+    certificateAuthorities:
+      - ca.org1.example.com
+    cryptoPath: ../crypto-config/peerOrganizations/org1.example.com/msp
+    mspid: Org1MSP
+    peers:
+      - peer1.org1.com
