@@ -39,6 +39,18 @@ class HttpProtocol(Protocol):
         """
         pass
 
+    @staticmethod
+    def build_http_data(
+        self, data: dict,
+        predicate=lambda key, value: not value in [None, '']
+    ):
+        result = {}
+        for key, value in data.items():
+            if predicate(key, value):
+                result[key] = value
+
+        return result
+
 
 class HttpClient:
 
@@ -88,8 +100,8 @@ class HttpClient:
 
 
 class HttpDynamicBody:
-    def __init__(self) -> None:
-        self.data = {}
+    def __init__(self, data={}) -> None:
+        self.data = data
 
     def __setattr__(self, __name: str, __value) -> None:
         if not __value in [None, '']:
