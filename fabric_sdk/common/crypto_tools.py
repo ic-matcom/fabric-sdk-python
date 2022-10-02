@@ -371,5 +371,11 @@ class Ecies:
             private_key, self.sign_hash_algorithm, default_backend())
 
 
-def decode_csr(csr):
-    return csr.public_bytes(Encoding.PEM).decode('utf-8'),
+class CertTools:
+    @staticmethod
+    def decode_csr(csr):
+        return csr.public_bytes(Encoding.PEM).decode('utf-8'),
+
+    @staticmethod
+    def get_subject(csr):
+        return x509.load_pem_x509_certificate(csr, default_backend()).subject

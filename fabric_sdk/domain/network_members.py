@@ -71,6 +71,20 @@ class EnrolledMember(NetworkMember):
         self.ca_cert_chain = ca_cert_chain
         self.private_key = private_key
 
+    def reenroll(
+        self,
+        enrollmentCert: str,
+        caCertChain: str,
+        private_key: str = None
+    ) -> 'EnrolledMember':
+
+        return EnrolledMember(
+            enrollmentCert=enrollmentCert,
+            caCertChain=caCertChain,
+            private_key=private_key,
+            ** self.__dict__
+        )
+
 
 class UnenrolledMember(NetworkMember):
     """

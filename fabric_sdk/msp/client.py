@@ -1,7 +1,7 @@
-from typing import Tuple
+from typing import Any, List, Optional, Tuple
 from fabric_sdk.context import ContextClient
 from fabric_sdk.common import HttpClient, HttpProtocol, Ecies, Crypto
-from fabric_sdk.common.crypto_tools import decode_csr
+from fabric_sdk.common.crypto_tools import CertTools, decode_csr
 import base64
 import json
 
@@ -73,72 +73,6 @@ class CAClient:
         # /!\ cannot mix f format and b
         return b'%s.%s' % (b64Cert, b64Sign)
 
-    def enroll(
-        self,
-        network_member: UnenrolledMember,
-        profile: str = '',
-        attr_reqs: list = None
-    ) -> EnrolledMember:
-        """Enroll a registered user in order to receive a signed X509
-         certificate
-
-        :param network_member: The network's member registered in CA, buy not enroll yet
-        :type network_member: WithoutEnrollMember
-
-        :param profile: The profile name.  Specify the 'tls' profile for a
-             TLS certificate; otherwise, an enrollment certificate is issued. (Default value = '')
-        :type profile: str
-
-        :param attr_reqs: An array of AttributeRequest
-        :type attr_reqs: list
-
-        :return: EnrollmentMember
-        :raises RequestException: errors in requests.exceptions
-        :raises ValueError: Failed response, json parse error, args missing
-        """
-
-        if attr_reqs:
-            if not isinstance(attr_reqs, list):
-                raise ValueError(
-                    "attr_reqs must be an array of AttributeRequest objects")
-            for attr in attr_reqs:
-                if not attr['name']:
-                    raise ValueError(
-                        "attr_reqs object is missing the name of the attribute")
-
-        private_key = None
-        if not csr:
-            private_key = self._crypto_primitives.generate_private_key()
-            csr = self._crypto_primitives.generate_csr(
-                private_key, network_member.enrollment_id)
-            csr = decode_csr(csr)
-
-        req = HttpProtocol.build_http_data({
-            'certificate_request':  csr,
-            'caname': self.__ca_config.name,
-            'profile': profile,
-            'attr_reqs': attr_reqs
-        })
-
-        res, st = self.http_client.post(
-            path=self.__path('enroll'),
-            json=req,
-            auth=(network_member.enrollment_id,
-                  network_member.enrollment_secret),
-            ** self.__ca_config.http_options
-        )
-
-        if res['success']:
-            return network_member.enroll(
-                base64.b64decode(res['result']['Cert']),
-                base64.b64decode(res['result']['ServerInfo']['CAChain']),
-                private_key
-            )
-
-        else:
-            raise ValueError("Enrollment failed with errors {0}"
-                             .format(res['errors']))
-
     def register(
         self,
         outsider_member: UnregisteredMember,
@@ -190,4 +124,129 @@ class CAClient:
             return outsider_member.registry(res['result']['secret'])
         else:
             raise ValueError("Registering failed with errors {0}"
+                             .format(res['errors']))
+
+    def enroll(
+        self,
+        network_member: UnenrolledMember,
+        profile: str = '',
+        attr_reqs: list = None
+    ) -> EnrolledMember:
+        """Enroll a registered user in order to receive a signed X509
+         certificate
+
+        :param network_member: The network's member registered in CA, buy not enroll yet
+        :type network_member: WithoutEnrollMember
+
+        :param profile: The profile name.  Specify the 'tls' profile for a
+             TLS certificate; otherwise, an enrollment certificate is issued. (Default value = '')
+        :type profile: str
+
+        :param attr_reqs: An array of AttributeRequest
+        :type attr_reqs: list
+
+        :return: EnrollmentMember
+        :raises RequestException: errors in requests.exceptions
+        :raises ValueError: Failed response, json parse error, args missing
+        """
+
+        if attr_reqs:
+            if not isinstance(attr_reqs, list):
+                raise ValueError(
+                    "attr_reqs must be an array of AttributeRequest objects")
+            for attr in attr_reqs:
+                if not attr['name']:
+                    raise ValueError(
+                        "attr_reqs object is missing the name of the attribute")
+
+        private_key = None
+        if not csr:
+            private_key = self._crypto_primitives.generate_private_key()
+            csr = self._crypto_primitives.generate_csr(
+                private_key, network_member.enrollment_id)
+            csr = CertTools.decode_csr(csr)
+
+        req = HttpProtocol.build_http_data({
+            'certificate_request':  csr,
+            'caname': self.__ca_config.name,
+            'profile': profile,
+            'attr_reqs': attr_reqs
+        })
+
+        res, st = self.http_client.post(
+            path=self.__path('enroll'),
+            json=req,
+            auth=(network_member.enrollment_id,
+                  network_member.enrollment_secret),
+            ** self.__ca_config.http_options
+        )
+
+        if res['success']:
+            return network_member.enroll(
+                base64.b64decode(res['result']['Cert']),
+                base64.b64decode(res['result']['ServerInfo']['CAChain']),
+                private_key
+            )
+
+        else:
+            raise ValueError("Enrollment failed with errors {0}"
+                             .format(res['errors']))
+
+    def reenroll(self, current_member: EnrolledMember, attr_reqs: Optional[List[Any]] = None) -> EnrolledMember:
+        """Re-enroll the member in cases such as the existing enrollment
+         certificate is about to expire, or it has been compromised
+
+        :param currentUser: The identity of the current user that
+             holds the existing enrollment certificate
+        :type currentUser: Enrollment
+        :param attr_reqs: Optional. An array of AttributeRequest that
+             indicate attributes to be included in the certificate
+        :return: PEM-encoded X509 certificate (Default value = None)
+        :type attr_reqs: list
+        :raises RequestException: errors in requests.exceptions
+        :raises ValueError: Failed response, json parse error, args missing
+        """
+
+        if attr_reqs:
+            if not isinstance(attr_reqs, list):
+                raise ValueError("attr_reqs must be an array of"
+                                 " AttributeRequest objects")
+            else:
+                for attr in attr_reqs:
+                    if not attr.name:
+                        raise ValueError("attr_reqs object is missing the name"
+                                         " of the attribute")
+
+        subject = CertTools.get_subject(current_member.enrollment_cert)
+
+        private_key = self._crypto_primitives.generate_private_key()
+        csr = self._crypto_primitives.generate_csr(
+            private_key, subject)
+        csr = CertTools.decode_csr(csr)
+
+        req = HttpProtocol.build_http_data({
+            'certificate_request':  csr,
+            'attr_reqs': attr_reqs
+        })
+
+        authorization = self.generateAuthToken(
+            req, current_member.enrollment_cert, current_member.private_key)
+
+        res, st = self.http_client.post(
+            path=self.__path('reenroll'),
+            json=req,
+            headers={
+                'Authorization': authorization},
+            ** self.__ca_config.http_options
+        )
+
+        if res['success']:
+            return current_member.reenroll(
+                base64.b64decode(res['result']['Cert']),
+                base64.b64decode(res['result']['ServerInfo']['CAChain']),
+                private_key
+            )
+
+        else:
+            raise ValueError("Enrollment failed with errors {0}"
                              .format(res['errors']))
