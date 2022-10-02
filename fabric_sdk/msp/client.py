@@ -1,11 +1,11 @@
 from typing import Any, List, Optional, Tuple
 from fabric_sdk.context import ContextClient
 from fabric_sdk.common import HttpClient, HttpProtocol, Ecies, Crypto
-from fabric_sdk.common.crypto_tools import CertTools, decode_csr
+from fabric_sdk.common.crypto_tools import CertTools
 import base64
 import json
 
-from fabric_sdk.domain.network_members import EnrolledMember, UnenrolledMember, UnregisteredMember
+from fabric_sdk.domain.network_members import EnrolledMember, RevokeRequest, UnenrolledMember, UnregisteredMember
 
 
 class CAClient:
@@ -196,13 +196,15 @@ class CAClient:
         """Re-enroll the member in cases such as the existing enrollment
          certificate is about to expire, or it has been compromised
 
-        :param currentUser: The identity of the current user that
+        :param current_member: The identity of the current user that
              holds the existing enrollment certificate
-        :type currentUser: Enrollment
+        :type current_member: EnrolledMember
         :param attr_reqs: Optional. An array of AttributeRequest that
              indicate attributes to be included in the certificate
-        :return: PEM-encoded X509 certificate (Default value = None)
         :type attr_reqs: list
+
+
+        :return: EnrolledMember
         :raises RequestException: errors in requests.exceptions
         :raises ValueError: Failed response, json parse error, args missing
         """
@@ -249,4 +251,49 @@ class CAClient:
 
         else:
             raise ValueError("Enrollment failed with errors {0}"
+                             .format(res['errors']))
+
+    def revoke(self, request: RevokeRequest, enroll_member: EnrolledMember) -> tuple[Any, Any]:
+        """Revoke an existing certificate (enrollment certificate or
+           transaction certificate), or revoke all certificates issued to an
+           enrollment id. If revoking a particular certificate, then both the
+           Authority Key Identifier and serial number are required. If
+           revoking by enrollment id, then all future requests to enroll this
+           id will be rejected.
+
+        :param request: Specific request to revoke any cert or member 
+        :type request: RevokeRequest
+
+        :param registrar: The enroll member that requested to revoke 
+        :type registrar: EnrollMember
+
+        :return: The revocation results
+        :raises RequestException: errors in requests.exceptions
+        :raises ValueError: Failed response, json parse error, args missing
+        """
+
+        req = HttpProtocol.build_http_data({
+            "id": request.enrollment_id,
+            "aki": request.aki,
+            "serial": request.serial,
+            "reason": request.reason,
+            "gencrl": request.gen_crl,
+            'caname': self.__ca_config.name,
+        })
+
+        authorization = self.generateAuthToken(
+            req, enroll_member.enrollment_cert, enroll_member.private_key)
+
+        res, st = self.http_client.post(
+            path=self.__path('revoke'),
+            json=req,
+            headers={
+                'Authorization': authorization},
+            ** self.__ca_config.http_options
+        )
+
+        if res['success']:
+            return res['result']['RevokedCerts'], res['result']['CRL']
+        else:
+            raise ValueError("Revoking failed with errors {0}"
                              .format(res['errors']))

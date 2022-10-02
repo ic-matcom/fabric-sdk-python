@@ -1,3 +1,7 @@
+from enum import Enum
+from typing import Optional
+
+
 class NetworkMember:
     """
     All member in Hyperledger Fabric Network(HFN) must have an id and some role.
@@ -174,3 +178,67 @@ class Organization(UnregisteredMember):
 class Peer(UnregisteredMember):
     def __init__(self, enrollment_id: str, enrollment_secret: str, affiliation: str) -> None:
         super().__init__(enrollment_id, enrollment_secret, 'peer', affiliation)
+
+
+class RevokeReason(Enum):
+    """
+    See https://godoc.org/golang.org/x/crypto/ocsp for valid values
+    """
+
+    UNSPECIFIED = (1, 'unspecified')
+    KEY_COMPROMISE = (2, 'keycompromise')
+    CA_COMPROMISE = (3, 'cacompromise')
+    AFFILIATION_CHANGE = (4, 'affiliationchange')
+    SUPERSEDED = (5, 'superseded')
+    CESSATION_OF_OPERATION = (6, 'cessationofoperation')
+    CERTIFICATE_HOLD = (7, 'certificatehold')
+    REVOKE_FROM_CLR = (8, 'removefromcrl')
+    PRIVILEGE_WITH_DRAW = (9, 'privilegewithdrawn')
+    AACOMPROMISE = (10, 'aacompromise')
+
+
+class RevokeRequest:
+    """
+    Request to revoke an existing certificate (enrollment certificate or
+    transaction certificate), or revoke all certificates issued to an
+    enrollment id. If revoking a particular certificate, then both the
+    Authority Key Identifier and serial number are required. If
+    revoking by enrollment id, then all future requests to enroll this
+    id will be rejected.
+    """
+
+    def __init__(
+        self,
+        reason: RevokeReason,
+        enrollment_id: Optional[str] = None,
+        aki: Optional[str] = None,
+        serial: Optional[str] = None,
+        gen_crl: bool = False
+    ) -> None:
+        """
+        :param enrollment_id: enrollmentID ID to revoke
+        :type enrollment_id: Optional[str]
+
+        :param aki: Authority Key Identifier string, hex encoded, for the
+             specific certificate to revoke
+        :type aki: Optional[str]
+
+        :param serial: Serial number string, hex encoded, for the specific
+             certificate to revoke
+        :type serial: Optional[str]
+
+        :param reason: The reason for revocation.
+        :type reason: RevokeReason
+
+        :param gen_crl: GenCRL specifies whether to generate a CRL
+        :type gen_crl: bool
+
+        :raises RequestException: errors in requests.exceptions
+        :raises ValueError: Failed response, json parse error, args missing
+        """
+
+        self.reason = reason
+        self.enrollment_id = enrollment_id
+        self.aki = aki
+        self.serial = serial
+        self.gen_crl = gen_crl
