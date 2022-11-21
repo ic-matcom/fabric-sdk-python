@@ -3,7 +3,7 @@
 ## 🤔 What's it?
 
 Python library that implements an SDK to operate with the main components 
-of the Hyperledger Fabric network. 
+of the Hyperledger Fabric network. \
 **Principal Skills**: `Python` `DSL` `DDD` `Hyperledger Fabric` `Bash` `Docker` 
 
 ## 🤓 Motivation 
